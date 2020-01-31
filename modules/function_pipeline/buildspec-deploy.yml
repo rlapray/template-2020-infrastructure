@@ -1,0 +1,22 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 12
+  pre_build:
+    commands:
+      - LISTENER_ARN=${alb_listener_arn}
+      - ENVIRONMENT=${environment}
+      - FUNCTION_NAME=${function_name}
+      - cd $ENVIRONMENT
+      - mv ../payload.zip .
+      - echo -e "listener_arn = \"$LISTENER_ARN\"" >> variables.tfvars
+      - echo -e "environment = \"$ENVIRONMENT\"" >> variables.tfvars
+      - echo -e "name = \"$FUNCTION_NAME\"" >> variables.tfvars
+      - wget https://releases.hashicorp.com/terraform/${terraform_version}/terraform_${terraform_version}_linux_amd64.zip
+      - unzip terraform_${terraform_version}_linux_amd64.zip
+  build:
+    commands:
+      - ./terraform init -no-color
+      - ./terraform apply -no-color -var-file=variables.tfvars -auto-approve

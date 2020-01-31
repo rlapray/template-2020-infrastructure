@@ -1,0 +1,38 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto11
+  pre_build:
+    commands:
+      - REPOSITORY_URI=${repository_url}
+      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - ACCOUNT_ID=`aws sts get-caller-identity | jq -r .Account`
+      - REGION=${region}
+      - SERVICE_NAME=${service_name}
+      - SQL_ENABLED=${sql_enabled}
+      - echo "SQL_ENABLED => $SQL_ENABLED"
+      - $(aws ecr get-login --region $REGION --no-include-email)
+      - IMAGE_FOUND=`aws ecr list-images --repository-name $SERVICE_NAME | jq -r '.imageIds[].imageTag == "'$IMAGE_TAG'"' | grep -c true || true`
+      - conf/generateBuildConf.sh  "$REPOSITORY_URI:$IMAGE_TAG" > buildinfo.conf
+  build:
+    commands:
+      - if [ $IMAGE_FOUND = "0" ]; then sbt dist; docker build -t "$REPOSITORY_URI:$IMAGE_TAG" . ; else echo "Image already in reposiory, skipping build phase"; fi
+  post_build:
+    commands:
+      - if [ $IMAGE_FOUND = "0" ]; then docker push $REPOSITORY_URI:$IMAGE_TAG ; else echo "Image already in repository, skipping docker push phase"; fi
+      - printf '{"ImageURI":"%s"}' $REPOSITORY_URI:$IMAGE_TAG > imageDetail.json
+      - conf/generateAppSpec.sh > appspec.yml
+      - conf/generateTaskDef.sh "staging" > staging-taskdef.json
+      - conf/generateTaskDef.sh "production" > production-taskdef.json
+artifacts:
+  files: 
+    - appspec.yml
+    - staging-taskdef.json
+    - production-taskdef.json
+    - imageDetail.json
+cache:
+  paths:
+    - '/root/.m2/**/*'
+    - '/root/.ivy2/**/*'

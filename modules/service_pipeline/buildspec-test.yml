@@ -1,0 +1,21 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      java: corretto11
+  build:
+    commands:
+      - sbt test
+artifacts:
+  files: imagedefinitions.json
+cache:
+  paths:
+    - '/root/.m2/**/*'
+    - '/root/.ivy2/**/*'
+reports:
+  reports:
+    files:
+      - '**/*'
+    base-directory: target/test-reports
+    file-format: JunitXml
